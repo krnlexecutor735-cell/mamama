@@ -1,7 +1,9 @@
 const socket = io();
 const world = document.getElementById('world');
+const joystick = document.getElementById('joystick');
 let players = {};
 let myId = null;
+let joy = { active: false, x: 0, y: 0 };
 
 socket.on('connect', () => {
     myId = socket.id;
@@ -36,10 +38,16 @@ socket.on('remove', (id) => {
     }
 });
 
-window.addEventListener('touchmove', (e) => {
-    if (players[myId]) {
-        players[myId].x += (e.touches[0].clientX - window.innerWidth / 2) / 20;
-        players[myId].y += (e.touches[0].clientY - window.innerHeight / 2) / 20;
+joystick.addEventListener('touchstart', (e) => joy.active = true);
+joystick.addEventListener('touchmove', (e) => {
+    if (joy.active && players[myId]) {
+        let touch = e.touches[0];
+        let rect = joystick.getBoundingClientRect();
+        let dx = touch.clientX - (rect.left + rect.width / 2);
+        let dy = touch.clientY - (rect.top + rect.height / 2);
+        players[myId].x += dx * 0.1;
+        players[myId].y += dy * 0.1;
         socket.emit('move', { x: players[myId].x, y: players[myId].y });
     }
 });
+joystick.addEventListener('touchend', () => joy.active = false);
