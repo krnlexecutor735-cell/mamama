@@ -11,9 +11,10 @@ app.use(express.static(__dirname));
 let players = {};
 
 io.on('connection', (socket) => {
+    // ให้ทุกคนเริ่มจากพิกัดโลกจุดเดียวกันที่ (0, 0)
     players[socket.id] = {
-        x: 400,
-        y: 300,
+        x: 0,
+        y: 0,
         os: 'Detecting...'
     };
 
@@ -36,4 +37,8 @@ io.on('connection', (socket) => {
     });
 });
 
-server.listen(3000);
+// เปลี่ยนไปใช้พอร์ตของ Render หรือระบบโฮสติ้งอื่นๆ
+const PORT = process.env.PORT || 3000;
+server.listen(PORT, () => {
+    console.log(`Server is running on port ${PORT}`);
+});
