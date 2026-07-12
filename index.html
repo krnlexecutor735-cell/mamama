@@ -1,33 +1,30 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <style>
-        body { margin: 0; background: #111; overflow: hidden; touch-action: none; }
-        #player { position: absolute; left: 100px; top: 100px; width: 40px; height: 40px; background: #7f5af0; border-radius: 50%; }
-        #joystick { position: fixed; bottom: 30px; left: 30px; width: 100px; height: 100px; background: #444; border-radius: 50%; border: 2px solid white; }
-    </style>
-</head>
-<body>
-    <div id="player"></div>
-    <div id="joystick"></div>
-    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
-    <script>
-        const socket = io();
-        const p = document.getElementById('player');
-        let x = 100, y = 100;
-        // ควบคุมด้วย WASD
-        window.addEventListener('keydown', (e) => {
-            if(e.key === 'w') y -= 10; if(e.key === 's') y += 10;
-            if(e.key === 'a') x -= 10; if(e.key === 'd') x += 10;
-            p.style.top = y + 'px'; p.style.left = x + 'px';
-        });
-        // ควบคุมด้วย Joystick
-        document.getElementById('joystick').addEventListener('touchmove', (e) => {
-            x += (e.touches[0].clientX - 80) * 0.1;
-            y += (e.touches[0].clientY - (window.innerHeight - 80)) * 0.1;
-            p.style.top = y + 'px'; p.style.left = x + 'px';
-        });
-    </script>
-</body>
-</html>
+const express = require('express');
+const app = express();
+const server = require('http').createServer(app);
+const io = require('socket.io')(server);
+
+app.use(express.static(__dirname));
+
+let players = {};
+
+io.on('connection', (socket) => {
+    socket.on('init', (data) => {
+        players[socket.id] = { x: 500, y: 500, os: data.os };
+        io.emit('update', players);
+    });
+
+    socket.on('move', (pos) => {
+        if (players[socket.id]) {
+            players[socket.id].x = pos.x;
+            players[socket.id].y = pos.y;
+            socket.broadcast.emit('move', { id: socket.id, x: pos.x, y: pos.y });
+        }
+    });
+
+    socket.on('disconnect', () => {
+        delete players[socket.id];
+        io.emit('remove', socket.id);
+    });
+});
+
+server.listen(process.env.PORT || 3000);
