@@ -1,145 +1,60 @@
 <!DOCTYPE html>
-<html lang="th">
+<html>
 <head>
-    <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Multiplayer OS Game</title>
     <style>
-        body { margin: 0; background-color: #111116; color: #fff; font-family: sans-serif; overflow: hidden; user-select: none; }
-        #game-window { position: relative; width: 100vw; height: 100vh; }
-        .player { position: absolute; width: 40px; height: 40px; background-color: #7f5af0; border-radius: 50%; transform: translate(-50%, -50%); box-shadow: 0 0 15px #7f5af0; }
-        .player.remote { background-color: #2cb67d; box-shadow: 0 0 15px #2cb67d; }
-        .os-tag { position: absolute; top: -35px; left: 50%; transform: translateX(-50%); background-color: rgba(0,0,0,0.8); padding: 4px 10px; border-radius: 4px; font-size: 12px; font-weight: bold; white-space: nowrap; border: 1px solid #7f5af0; }
-        .player.remote .os-tag { border-color: #2cb67d; }
-        #joystick-zone { position: absolute; bottom: 50px; left: 50px; width: 120px; height: 120px; background: rgba(255,255,255,0.05); border: 2px solid rgba(255,255,255,0.2); border-radius: 50%; touch-action: none; }
-        #joystick-stick { width: 50px; height: 50px; background: #7f5af0; border-radius: 50%; position: absolute; top: 35px; left: 35px; pointer-events: none; }
+        body { margin: 0; background: #111; overflow: hidden; touch-action: none; }
+        #world { position: absolute; width: 3000px; height: 3000px; background: radial-gradient(#1a1a1a, #000); will-change: transform; }
+        .player { position: absolute; width: 40px; height: 40px; background: #7f5af0; border-radius: 50%; transform: translate(-50%, -50%); transition: left 0.05s linear, top 0.05s linear; }
+        .remote { background: #2cb67d; }
     </style>
-    <script src="/socket.io/socket.io.js"></script>
 </head>
 <body>
+    <div id="world"></div>
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+        const socket = io();
+        const world = document.getElementById('world');
+        let players = {};
+        let my = { x: 1500, y: 1500, el: document.createElement('div') };
+        
+        my.el.className = 'player';
+        world.appendChild(my.el);
+        players[socket.id] = my;
 
-<div id="game-window">
-    <div id="joystick-zone"><div id="joystick-stick"></div></div>
-</div>
+        socket.on('move', (d) => {
+            if(!players[d.id]) {
+                let el = document.createElement('div');
+                el.className = 'player remote';
+                world.appendChild(el);
+                players[d.id] = { el: el, x: d.x, y: d.y };
+            }
+            players[d.id].x = d.x;
+            players[d.id].y = d.y;
+            players[d.id].el.style.left = d.x + 'px';
+            players[d.id].el.style.top = d.y + 'px';
+        });
 
-<script>
-    const socket = io();
-    const gameWindow = document.getElementById('game-window');
-    const joystickZone = document.getElementById('joystick-zone');
-    const joystickStick = document.getElementById('joystick-stick');
-
-    let localPlayer = { x: window.innerWidth / 2, y: window.innerHeight / 2 };
-    let remotePlayers = {};
-    let keys = {};
-    let joystickInput = { x: 0, y: 0 };
-    let isDragging = false;
-    const speed = 5;
-
-    function detectOS() {
-        const ua = navigator.userAgent;
-        if (/android/i.test(ua)) return 'Android';
-        if (/iPad|iPhone|iPod/.test(ua)) return 'iOS';
-        if (/Macintosh|MacIntel/.test(ua)) return 'Mac OS';
-        if (/Win32|Win64|Windows/.test(ua)) return 'Windows';
-        if (/Linux/.test(ua)) return 'Linux';
-        return 'Unknown OS';
-    }
-
-    socket.on('connect', () => {
-        socket.emit('initOS', detectOS());
-    });
-
-    socket.on('updatePlayers', (serverPlayers) => {
-        Object.keys(serverPlayers).forEach((id) => {
-            if (id !== socket.id && !remotePlayers[id]) {
-                createPlayerDOM(id, serverPlayers[id].os, serverPlayers[id].x, serverPlayers[id].y);
+        socket.on('remove', (id) => {
+            if(players[id]) {
+                players[id].el.remove();
+                delete players[id];
             }
         });
-    });
 
-    socket.on('playerMoved', (data) => {
-        if (remotePlayers[data.id]) {
-            remotePlayers[data.id].style.left = data.x + 'px';
-            remotePlayers[data.id].style.top = data.y + 'px';
+        function update() {
+            my.el.style.left = my.x + 'px';
+            my.el.style.top = my.y + 'px';
+            world.style.transform = `translate(${window.innerWidth/2 - my.x}px, ${window.innerHeight/2 - my.y}px)`;
+            requestAnimationFrame(update);
         }
-    });
+        update();
 
-    socket.on('playerDisconnected', (id) => {
-        if (remotePlayers[id]) {
-            remotePlayers[id].remove();
-            delete remotePlayers[id];
-        }
-    });
-
-    function createPlayerDOM(id, os, x, y) {
-        const el = document.createElement('div');
-        el.className = 'player remote';
-        el.style.left = x + 'px';
-        el.style.top = y + 'px';
-        el.innerHTML = `<div class="os-tag">${os}</div>`;
-        gameWindow.appendChild(el);
-        remotePlayers[id] = el;
-    }
-
-    const myEl = document.createElement('div');
-    myEl.className = 'player';
-    myEl.innerHTML = `<div class="os-tag">${detectOS()}</div>`;
-    gameWindow.appendChild(myEl);
-
-    window.addEventListener('keydown', (e) => { keys[e.key.toLowerCase()] = true; });
-    window.addEventListener('keyup', (e) => { keys[e.key.toLowerCase()] = false; });
-
-    joystickZone.addEventListener('touchstart', (e) => { isDragging = true; handleJoystick(e); });
-    window.addEventListener('touchmove', (e) => { if (isDragging) handleJoystick(e); }, { passive: false });
-    window.addEventListener('touchend', () => {
-        isDragging = false;
-        joystickStick.style.transform = 'translate(0px, 0px)';
-        joystickInput = { x: 0, y: 0 };
-    });
-
-    function handleJoystick(e) {
-        e.preventDefault();
-        const touch = e.touches[0];
-        const rect = joystickZone.getBoundingClientRect();
-        const centerX = rect.left + rect.width / 2;
-        const centerY = rect.top + rect.height / 2;
-        let deltaX = touch.clientX - centerX;
-        let deltaY = touch.clientY - centerY;
-        const distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
-        const maxRadius = rect.width / 2;
-
-        if (distance > maxRadius) {
-            deltaX = (deltaX / distance) * maxRadius;
-            deltaY = (deltaY / distance) * maxRadius;
-        }
-        joystickStick.style.transform = `translate(${deltaX}px, ${deltaY}px)`;
-        joystickInput.x = deltaX / maxRadius;
-        joystickInput.y = deltaY / maxRadius;
-    }
-
-    function update() {
-        let moved = false;
-        if (keys['w'] || keys['arrowup']) { localPlayer.y -= speed; moved = true; }
-        if (keys['s'] || keys['arrowdown']) { localPlayer.y += speed; moved = true; }
-        if (keys['a'] || keys['arrowleft']) { localPlayer.x -= speed; moved = true; }
-        if (keys['d'] || keys['arrowright']) { localPlayer.x += speed; moved = true; }
-
-        if (joystickInput.x !== 0 || joystickInput.y !== 0) {
-            localPlayer.x += joystickInput.x * speed;
-            localPlayer.y += joystickInput.y * speed;
-            moved = true;
-        }
-
-        if (moved) {
-            localPlayer.x = Math.max(20, Math.min(window.innerWidth - 20, localPlayer.x));
-            localPlayer.y = Math.max(20, Math.min(window.innerHeight - 20, localPlayer.y));
-            myEl.style.left = localPlayer.x + 'px';
-            myEl.style.top = localPlayer.y + 'px';
-            socket.emit('move', { x: localPlayer.x, y: localPlayer.y });
-        }
-        requestAnimationFrame(update);
-    }
-    requestAnimationFrame(update);
-</script>
+        window.addEventListener('touchmove', (e) => {
+            my.x += (e.touches[0].clientX - window.innerWidth/2) / 20;
+            my.y += (e.touches[0].clientY - window.innerHeight/2) / 20;
+            socket.emit('move', {x: my.x, y: my.y});
+        });
+    </script>
 </body>
 </html>
