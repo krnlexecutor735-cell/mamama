@@ -3,7 +3,6 @@ const world = document.getElementById('world');
 const joystick = document.getElementById('joystick');
 let players = {};
 let myId = null;
-let joy = { active: false, x: 0, y: 0 };
 
 socket.on('connect', () => {
     myId = socket.id;
@@ -32,22 +31,31 @@ socket.on('move', (d) => {
 });
 
 socket.on('remove', (id) => {
-    if (players[id]) {
-        players[id].el.remove();
-        delete players[id];
-    }
+    if (players[id]) { players[id].el.remove(); delete players[id]; }
 });
 
-joystick.addEventListener('touchstart', (e) => joy.active = true);
+// ระบบควบคุม
 joystick.addEventListener('touchmove', (e) => {
-    if (joy.active && players[myId]) {
-        let touch = e.touches[0];
-        let rect = joystick.getBoundingClientRect();
-        let dx = touch.clientX - (rect.left + rect.width / 2);
-        let dy = touch.clientY - (rect.top + rect.height / 2);
-        players[myId].x += dx * 0.1;
-        players[myId].y += dy * 0.1;
-        socket.emit('move', { x: players[myId].x, y: players[myId].y });
-    }
+    if (!myId || !players[myId]) return;
+    let touch = e.touches[0];
+    let rect = joystick.getBoundingClientRect();
+    let dx = (touch.clientX - (rect.left + rect.width / 2)) * 0.1;
+    let dy = (touch.clientY - (rect.top + rect.height / 2)) * 0.1;
+    
+    players[myId].x += dx;
+    players[myId].y += dy;
+    players[myId].el.style.left = players[myId].x + 'px';
+    players[myId].el.style.top = players[myId].y + 'px';
+    
+    socket.emit('move', { x: players[myId].x, y: players[myId].y });
 });
-joystick.addEventListener('touchend', () => joy.active = false);
+
+// WASD สำหรับคอมพิวเตอร์
+window.addEventListener('keydown', (e) => {
+    if (!players[myId]) return;
+    if (e.key === 'w') players[myId].y -= 10;
+    if (e.key === 's') players[myId].y += 10;
+    if (e.key === 'a') players[myId].x -= 10;
+    if (e.key === 'd') players[myId].x += 10;
+    socket.emit('move', { x: players[myId].x, y: players[myId].y });
+});
