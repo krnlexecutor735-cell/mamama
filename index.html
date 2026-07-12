@@ -1,19 +1,29 @@
 <!DOCTYPE html>
-<html>
+<html lang="th">
 <head>
+    <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Game</title>
     <style>
-        body { margin: 0; background: #111; overflow: hidden; touch-action: none; }
+        body { margin: 0; background: #1a1a1a; overflow: hidden; touch-action: none; font-family: sans-serif; }
         #world { position: absolute; width: 3000px; height: 3000px; background: radial-gradient(#222, #000); }
-        .player { position: absolute; width: 40px; height: 40px; background: #7f5af0; border-radius: 50%; display: flex; align-items: center; justify-content: center; transform: translate(-50%, -50%); }
-        .os-label { position: absolute; top: -25px; color: #fff; font-size: 12px; font-family: sans-serif; white-space: nowrap; }
-        .remote { background: #2cb67d; }
-        #joystick { position: fixed; bottom: 50px; left: 50px; width: 120px; height: 120px; background: rgba(255,255,255,0.1); border-radius: 50%; }
+        
+        /* Player & Label */
+        .player { position: absolute; left: 100px; top: 100px; width: 50px; height: 50px; background: #7f5af0; border-radius: 50%; display: flex; align-items: center; justify-content: center; }
+        .os-label { position: absolute; top: -25px; color: white; font-size: 14px; font-weight: bold; }
+        
+        /* Joystick */
+        #joystick { position: fixed; bottom: 30px; left: 30px; width: 120px; height: 120px; background: rgba(255,255,255,0.2); border-radius: 50%; border: 2px solid white; z-index: 999; }
     </style>
 </head>
 <body>
-    <div id="world"></div>
+    <div id="world">
+        <div id="player" class="player">
+            <div id="os-label" class="os-label">Loading...</div>
+        </div>
+    </div>
     <div id="joystick"></div>
+
     <script src="/socket.io/socket.io.js"></script>
     <script src="game.js"></script>
 </body>
