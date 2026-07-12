@@ -1,39 +1,22 @@
 const express = require('express');
-const http = require('http');
-const { Server } = require('socket.io');
-
 const app = express();
-const server = http.createServer(app);
-const io = new Server(server, { cors: { origin: "*" } });
+const server = require('http').createServer(app);
+const io = require('socket.io')(server);
 
 app.use(express.static(__dirname));
 
 let players = {};
 
 io.on('connection', (socket) => {
-    players[socket.id] = {
-        x: 400,
-        y: 300,
-        os: 'Detecting...'
-    };
-
-    socket.on('initOS', (os) => {
-        if (players[socket.id]) players[socket.id].os = os;
-        io.emit('updatePlayers', players);
-    });
-
-    socket.on('move', (data) => {
+    players[socket.id] = { x: 500, y: 500 };
+    socket.on('move', (pos) => {
         if (players[socket.id]) {
-            players[socket.id].x = data.x;
-            players[socket.id].y = data.y;
-            socket.broadcast.emit('playerMoved', { id: socket.id, x: data.x, y: data.y });
+            players[socket.id].x = pos.x;
+            players[socket.id].y = pos.y;
+            socket.broadcast.emit('move', { id: socket.id, x: pos.x, y: pos.y });
         }
     });
-
-    socket.on('disconnect', () => {
-        delete players[socket.id];
-        io.emit('playerDisconnected', socket.id);
-    });
+    socket.on('disconnect', () => { delete players[socket.id]; io.emit('remove', socket.id); });
 });
 
 server.listen(3000);
