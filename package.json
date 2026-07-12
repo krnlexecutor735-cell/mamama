@@ -1,6 +1,7 @@
 {
-  "name": "multiplayer-game",
+  "name": "os-multiplayer-game",
   "version": "1.0.0",
+  "description": "Multiplayer OS Game with Infinite Map",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"
