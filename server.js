@@ -8,13 +8,13 @@ app.use(express.static(__dirname));
 let players = {};
 
 io.on('connection', (socket) => {
-    // รอรับค่า OS ตอนเชื่อมต่อครั้งแรก
+    // เมื่อมีคนเข้า ให้สร้างข้อมูลผู้เล่นเริ่มต้นทันที
+    players[socket.id] = { x: 500, y: 500, os: 'Unknown' };
+    
     socket.on('init', (os) => {
-        players[socket.id] = { x: 500, y: 500, os: os };
-        // ส่งข้อมูลผู้เล่นใหม่ให้คนอื่นในห้อง
-        socket.broadcast.emit('newPlayer', { id: socket.id, os: os, x: 500, y: 500 });
-        // ส่งรายชื่อผู้เล่นทั้งหมดที่มีอยู่แล้วให้คนที่เพิ่งเข้ามา
-        socket.emit('currentPlayers', players);
+        players[socket.id].os = os;
+        // ส่งสถานะปัจจุบันให้ทุกคนเห็น
+        io.emit('updatePlayers', players);
     });
 
     socket.on('move', (pos) => {
@@ -25,7 +25,10 @@ io.on('connection', (socket) => {
         }
     });
 
-    socket.on('disconnect', () => { delete players[socket.id]; io.emit('remove', socket.id); });
+    socket.on('disconnect', () => {
+        delete players[socket.id];
+        io.emit('remove', socket.id);
+    });
 });
 
-server.listen(3000);
+server.listen(process.env.PORT || 3000);
