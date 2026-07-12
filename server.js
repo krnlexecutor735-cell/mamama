@@ -11,7 +11,6 @@ app.use(express.static(__dirname));
 let players = {};
 
 io.on('connection', (socket) => {
-    // ให้ทุกคนเริ่มจากพิกัดโลกจุดเดียวกันที่ (0, 0)
     players[socket.id] = {
         x: 0,
         y: 0,
@@ -31,13 +30,24 @@ io.on('connection', (socket) => {
         }
     });
 
+    // ดักฟังข้อความแชทที่ถูกส่งมาจากฝั่งผู้เล่น
+    socket.on('sendMessage', (text) => {
+        if (players[socket.id]) {
+            // แพร่กระจายข้อความที่พิมพ์ ไปยังทุกคนที่เชื่อมต่ออยู่
+            io.emit('newMessage', {
+                id: socket.id,
+                os: players[socket.id].os,
+                text: text
+            });
+        }
+    });
+
     socket.on('disconnect', () => {
         delete players[socket.id];
         io.emit('playerDisconnected', socket.id);
     });
 });
 
-// เปลี่ยนไปใช้พอร์ตของ Render หรือระบบโฮสติ้งอื่นๆ
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
     console.log(`Server is running on port ${PORT}`);
