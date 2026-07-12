@@ -4,69 +4,17 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <style>
         body { margin: 0; background: #111; overflow: hidden; touch-action: none; }
-        #world { position: absolute; width: 3000px; height: 3000px; background: radial-gradient(#1a1a1a, #000); transition: transform 0.05s ease-out; }
-        .player { position: absolute; width: 40px; height: 40px; background: #7f5af0; border-radius: 50%; display: flex; align-items: center; justify-content: center; }
-        .os-label { position: absolute; top: -25px; color: white; font-size: 12px; white-space: nowrap; font-family: sans-serif; }
+        #world { position: absolute; width: 3000px; height: 3000px; background: radial-gradient(#222, #000); }
+        .player { position: absolute; width: 40px; height: 40px; background: #7f5af0; border-radius: 50%; display: flex; align-items: center; justify-content: center; transform: translate(-50%, -50%); }
+        .os-label { position: absolute; top: -25px; color: #fff; font-size: 12px; font-family: sans-serif; white-space: nowrap; }
         .remote { background: #2cb67d; }
+        #joystick { position: fixed; bottom: 50px; left: 50px; width: 120px; height: 120px; background: rgba(255,255,255,0.1); border-radius: 50%; }
     </style>
 </head>
 <body>
     <div id="world"></div>
+    <div id="joystick"></div>
     <script src="/socket.io/socket.io.js"></script>
-    <script>
-        const socket = io();
-        const world = document.getElementById('world');
-        let players = {};
-        let myId = null;
-
-        socket.on('connect', () => {
-            myId = socket.id;
-            socket.emit('init', navigator.platform || 'Unknown');
-        });
-
-        socket.on('updatePlayers', (data) => {
-            for(let id in data) {
-                if(!players[id]) {
-                    createPlayer(id, data[id]);
-                }
-            }
-        });
-
-        function createPlayer(id, data) {
-            let el = document.createElement('div');
-            el.className = 'player ' + (id === myId ? '' : 'remote');
-            let label = document.createElement('div');
-            label.className = 'os-label';
-            label.innerText = data.os;
-            el.appendChild(label);
-            world.appendChild(el);
-            players[id] = { el: el, x: data.x, y: data.y };
-            el.style.left = data.x + 'px';
-            el.style.top = data.y + 'px';
-        }
-
-        socket.on('move', (d) => {
-            if(players[d.id]) {
-                players[d.id].x = d.x; players[d.id].y = d.y;
-                players[d.id].el.style.left = d.x + 'px';
-                players[d.id].el.style.top = d.y + 'px';
-            }
-        });
-
-        function update() {
-            if(myId && players[myId]) {
-                world.style.transform = `translate(${window.innerWidth/2 - players[myId].x}px, ${window.innerHeight/2 - players[myId].y}px)`;
-            }
-            requestAnimationFrame(update);
-        }
-        update();
-
-        window.addEventListener('touchmove', (e) => {
-            if(!myId || !players[myId]) return;
-            players[myId].x += (e.touches[0].clientX - window.innerWidth/2) / 20;
-            players[myId].y += (e.touches[0].clientY - window.innerHeight/2) / 20;
-            socket.emit('move', {x: players[myId].x, y: players[myId].y});
-        });
-    </script>
+    <script src="game.js"></script>
 </body>
 </html>
