@@ -2,32 +2,49 @@ const express = require('express');
 const app = express();
 const http = require('http').createServer(app);
 const io = require('socket.io')(http);
-const path = require('path');
 
-app.use(express.static(__dirname));
+const PORT = process.env.PORT || 3000;
 
-let players = {};
+app.use(express.static('public'));
+
+// เก็บข้อมูลผู้เล่นทั้งหมด
+const players = {};
 
 io.on('connection', (socket) => {
-    // กำหนดตำแหน่งเริ่มต้น
-    players[socket.id] = { x: 400, y: 300, os: socket.handshake.query.os || 'Unknown' };
+    console.log('User connected:', socket.id);
 
-    // รับคำสั่งเคลื่อนที่ (รับมาแค่ทิศทาง dx, dy)
-    socket.on('move', (data) => {
+    // เมื่อผู้เล่นเข้ามาใหม่
+    socket.on('join', (data) => {
+        players[socket.id] = {
+            x: 0,
+            y: 0,
+            color: `hsl(${Math.random() * 360}, 70%, 50%)`, // สุ่มสีให้แต่ละคน
+            os: data.os
+        };
+        // ส่งข้อมูลผู้เล่นทั้งหมดให้คนที่เพิ่งเข้ามา
+        socket.emit('currentPlayers', players);
+        // แจ้งทุกคนว่ามีคนใหม่เข้ามา
+        socket.broadcast.emit('newPlayer', { id: socket.id, player: players[socket.id] });
+    });
+
+    // เมื่อมีการขยับตัว
+    socket.on('playerMovement', (movementData) => {
         if (players[socket.id]) {
-            players[socket.id].x += data.dx;
-            players[socket.id].y += data.dy;
+            players[socket.id].x = movementData.x;
+            players[socket.id].y = movementData.y;
+            // ส่งตำแหน่งใหม่ให้ทุกคน (ยกเว้นตัวเอง)
+            socket.broadcast.emit('playerMoved', { id: socket.id, x: movementData.x, y: movementData.y });
         }
     });
 
+    // เมื่อผู้เล่นออก
     socket.on('disconnect', () => {
+        console.log('User disconnected:', socket.id);
         delete players[socket.id];
+        io.emit('playerDisconnected', socket.id);
     });
 });
 
-// ส่งสถานะให้ทุกคน 60 ครั้งต่อวินาที
-setInterval(() => {
-    io.emit('update', players);
-}, 1000 / 60);
-
-http.listen(process.env.PORT || 3000);
+http.listen(PORT, () => {
+    console.log(`Server running on port ${PORT}`);
+});
