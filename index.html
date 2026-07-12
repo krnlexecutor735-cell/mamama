@@ -4,8 +4,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <style>
         body { margin: 0; background: #111; overflow: hidden; touch-action: none; }
-        #world { position: absolute; width: 3000px; height: 3000px; background: radial-gradient(#1a1a1a, #000); will-change: transform; }
-        .player { position: absolute; width: 40px; height: 40px; background: #7f5af0; border-radius: 50%; transform: translate(-50%, -50%); transition: left 0.05s linear, top 0.05s linear; }
+        #world { position: absolute; width: 3000px; height: 3000px; background: radial-gradient(#1a1a1a, #000); }
+        .player { position: absolute; width: 40px; height: 40px; background: #7f5af0; border-radius: 50%; display: flex; align-items: center; justify-content: center; }
+        .os-label { position: absolute; top: -25px; color: white; font-size: 12px; white-space: nowrap; font-family: sans-serif; }
         .remote { background: #2cb67d; }
     </style>
 </head>
@@ -16,44 +17,52 @@
         const socket = io();
         const world = document.getElementById('world');
         let players = {};
-        let my = { x: 1500, y: 1500, el: document.createElement('div') };
         
-        my.el.className = 'player';
-        world.appendChild(my.el);
-        players[socket.id] = my;
+        // ส่ง OS ของตัวเองไปบอก Server
+        socket.emit('init', navigator.platform);
+
+        function createPlayer(id, data) {
+            let el = document.createElement('div');
+            el.className = 'player' + (id !== socket.id ? ' remote' : '');
+            
+            let label = document.createElement('div');
+            label.className = 'os-label';
+            label.innerText = data.os; // แสดง OS
+            
+            el.appendChild(label);
+            world.appendChild(el);
+            players[id] = { el: el, x: data.x, y: data.y };
+        }
+
+        socket.on('currentPlayers', (data) => {
+            for(let id in data) createPlayer(id, data[id]);
+        });
+
+        socket.on('newPlayer', (d) => createPlayer(d.id, d));
 
         socket.on('move', (d) => {
-            if(!players[d.id]) {
-                let el = document.createElement('div');
-                el.className = 'player remote';
-                world.appendChild(el);
-                players[d.id] = { el: el, x: d.x, y: d.y };
+            if(players[d.id]) {
+                players[d.id].x = d.x; players[d.id].y = d.y;
+                players[d.id].el.style.left = d.x + 'px';
+                players[d.id].el.style.top = d.y + 'px';
             }
-            players[d.id].x = d.x;
-            players[d.id].y = d.y;
-            players[d.id].el.style.left = d.x + 'px';
-            players[d.id].el.style.top = d.y + 'px';
         });
 
-        socket.on('remove', (id) => {
-            if(players[id]) {
-                players[id].el.remove();
-                delete players[id];
-            }
-        });
+        socket.on('remove', (id) => { if(players[id]) { players[id].el.remove(); delete players[id]; }});
 
         function update() {
-            my.el.style.left = my.x + 'px';
-            my.el.style.top = my.y + 'px';
-            world.style.transform = `translate(${window.innerWidth/2 - my.x}px, ${window.innerHeight/2 - my.y}px)`;
+            if(players[socket.id]) {
+                world.style.transform = `translate(${window.innerWidth/2 - players[socket.id].x}px, ${window.innerHeight/2 - players[socket.id].y}px)`;
+            }
             requestAnimationFrame(update);
         }
         update();
 
         window.addEventListener('touchmove', (e) => {
-            my.x += (e.touches[0].clientX - window.innerWidth/2) / 20;
-            my.y += (e.touches[0].clientY - window.innerHeight/2) / 20;
-            socket.emit('move', {x: my.x, y: my.y});
+            if(!players[socket.id]) return;
+            players[socket.id].x += (e.touches[0].clientX - window.innerWidth/2) / 20;
+            players[socket.id].y += (e.touches[0].clientY - window.innerHeight/2) / 20;
+            socket.emit('move', {x: players[socket.id].x, y: players[socket.id].y});
         });
     </script>
 </body>
