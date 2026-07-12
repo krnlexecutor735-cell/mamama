@@ -2,33 +2,38 @@
 <html>
 <body style="margin:0; overflow:hidden;">
 <canvas id="game"></canvas>
-<div id="controls" style="position:fixed; bottom:20px; left:20px;">
-    <button ontouchstart="move(0,-10)" style="padding:20px">Up</button>
-    <button ontouchstart="move(0,10)" style="padding:20px">Down</button>
-    <button ontouchstart="move(-10,0)" style="padding:20px">Left</button>
-    <button ontouchstart="move(10,0)" style="padding:20px">Right</button>
-</div>
 <script src="/socket.io/socket.io.js"></script>
 <script>
-const socket = io({query:{os:navigator.platform}});
+const socket = io({ query: { os: navigator.platform } });
 const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d');
-let players = {}, pos = {x:0, y:0};
-canvas.width = window.innerWidth; canvas.height = window.innerHeight;
-function move(dx, dy) { pos.x += dx; pos.y += dy; socket.emit('move', pos); }
+canvas.width = window.innerWidth;
+canvas.height = window.innerHeight;
+
+let players = {};
+let myPos = { x: 0, y: 0 };
+
 window.addEventListener('keydown', (e) => {
-    if(e.key==='w') move(0,-10); if(e.key==='s') move(0,10);
-    if(e.key==='a') move(-10,0); if(e.key==='d') move(10,0);
+    if (e.key === 'w') myPos.y -= 10;
+    if (e.key === 's') myPos.y += 10;
+    if (e.key === 'a') myPos.x -= 10;
+    if (e.key === 'd') myPos.x += 10;
+    socket.emit('move', myPos);
 });
-socket.on('update', (data) => {
-    players = data;
-    ctx.clearRect(0,0, canvas.width, canvas.height);
-    for(let id in players) {
+
+socket.on('update', (serverPlayers) => {
+    players = serverPlayers;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    
+    for (let id in players) {
         let p = players[id];
-        let screenX = (p.x - pos.x) + canvas.width/2;
-        let screenY = (p.y - pos.y) + canvas.height/2;
-        ctx.beginPath(); ctx.arc(screenX, screenY, 20, 0, Math.PI*2); ctx.fill();
-        ctx.fillText(p.os, screenX-15, screenY-30);
+        let drawX = (p.x - myPos.x) + (canvas.width / 2);
+        let drawY = (p.y - myPos.y) + (canvas.height / 2);
+        
+        ctx.beginPath();
+        ctx.arc(drawX, drawY, 20, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillText(p.os, drawX - 10, drawY - 30);
     }
 });
 </script>
