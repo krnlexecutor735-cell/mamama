@@ -1,20 +1,58 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <style>
-        body { margin: 0; background: #111; overflow: hidden; touch-action: none; font-family: sans-serif; }
-        #world { position: absolute; width: 3000px; height: 3000px; background: radial-gradient(#222, #000); }
-        .player { position: absolute; width: 40px; height: 40px; background: #7f5af0; border-radius: 50%; transition: left 0.05s linear, top 0.05s linear; display: flex; align-items: center; justify-content: center; }
-        .os-label { position: absolute; top: -35px; color: #fff; font-size: 14px; background: rgba(0,0,0,0.5); padding: 2px 5px; border-radius: 4px; pointer-events: none; }
-        .remote { background: #2cb67d; }
-        #joystick { position: fixed; bottom: 40px; left: 40px; width: 120px; height: 120px; background: rgba(255,255,255,0.1); border-radius: 50%; border: 2px solid rgba(255,255,255,0.3); z-index: 10; }
+        body { margin: 0; background: #111; overflow: hidden; touch-action: none; }
+        #world { position: relative; width: 100vw; height: 100vh; background: radial-gradient(#222, #000); }
+        .player { position: absolute; width: 50px; height: 50px; background: #7f5af0; border-radius: 50%; display: flex; align-items: center; justify-content: center; transition: 0.05s; }
+        .label { position: absolute; top: -30px; color: #fff; font-size: 12px; background: rgba(0,0,0,0.5); padding: 2px 5px; border-radius: 4px; pointer-events: none; }
+        #joystick { position: fixed; bottom: 50px; left: 50px; width: 120px; height: 120px; background: rgba(255,255,255,0.1); border-radius: 50%; border: 2px solid #fff; z-index: 100; }
     </style>
 </head>
 <body>
     <div id="world"></div>
     <div id="joystick"></div>
     <script src="/socket.io/socket.io.js"></script>
-    <script src="game.js"></script>
+    <script>
+        const socket = io();
+        const world = document.getElementById('world');
+        const joystick = document.getElementById('joystick');
+        let players = {};
+        let myId = null;
+
+        socket.on('connect', () => {
+            myId = socket.id;
+            socket.emit('init', { os: navigator.platform, x: window.innerWidth/2, y: window.innerHeight/2 });
+        });
+
+        socket.on('update', (data) => {
+            for (let id in data) {
+                if (!players[id]) {
+                    let el = document.createElement('div');
+                    el.className = 'player';
+                    el.innerHTML = `<div class="label">${data[id].os}</div>`;
+                    world.appendChild(el);
+                    players[id] = { el: el, x: data[id].x, y: data[id].y };
+                }
+                players[id].el.style.left = data[id].x + 'px';
+                players[id].el.style.top = data[id].y + 'px';
+            }
+        });
+
+        // ควบคุมผ่าน Joystick
+        joystick.addEventListener('touchmove', (e) => {
+            if (!players[myId]) return;
+            let t = e.touches[0];
+            let rect = joystick.getBoundingClientRect();
+            let dx = (t.clientX - (rect.left + rect.width/2)) * 0.2;
+            let dy = (t.clientY - (rect.top + rect.height/2)) * 0.2;
+            players[myId].x += dx;
+            players[myId].y += dy;
+            players[myId].el.style.left = players[myId].x + 'px';
+            players[myId].el.style.top = players[myId].y + 'px';
+            socket.emit('move', { x: players[myId].x, y: players[myId].y });
+        });
+    </script>
 </body>
 </html>
