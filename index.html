@@ -1,30 +1,20 @@
-const express = require('express');
-const app = express();
-const server = require('http').createServer(app);
-const io = require('socket.io')(server);
-
-app.use(express.static(__dirname));
-
-let players = {};
-
-io.on('connection', (socket) => {
-    socket.on('init', (data) => {
-        players[socket.id] = { x: 500, y: 500, os: data.os };
-        io.emit('update', players);
-    });
-
-    socket.on('move', (pos) => {
-        if (players[socket.id]) {
-            players[socket.id].x = pos.x;
-            players[socket.id].y = pos.y;
-            socket.broadcast.emit('move', { id: socket.id, x: pos.x, y: pos.y });
-        }
-    });
-
-    socket.on('disconnect', () => {
-        delete players[socket.id];
-        io.emit('remove', socket.id);
-    });
-});
-
-server.listen(process.env.PORT || 3000);
+<!DOCTYPE html>
+<html>
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <style>
+        body { margin: 0; background: #111; overflow: hidden; touch-action: none; font-family: sans-serif; }
+        #world { position: absolute; width: 3000px; height: 3000px; background: radial-gradient(#222, #000); }
+        .player { position: absolute; width: 40px; height: 40px; background: #7f5af0; border-radius: 50%; transition: left 0.05s linear, top 0.05s linear; display: flex; align-items: center; justify-content: center; }
+        .os-label { position: absolute; top: -35px; color: #fff; font-size: 14px; background: rgba(0,0,0,0.5); padding: 2px 5px; border-radius: 4px; pointer-events: none; }
+        .remote { background: #2cb67d; }
+        #joystick { position: fixed; bottom: 40px; left: 40px; width: 120px; height: 120px; background: rgba(255,255,255,0.1); border-radius: 50%; border: 2px solid rgba(255,255,255,0.3); z-index: 10; }
+    </style>
+</head>
+<body>
+    <div id="world"></div>
+    <div id="joystick"></div>
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="game.js"></script>
+</body>
+</html>
