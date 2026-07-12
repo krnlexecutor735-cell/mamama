@@ -1,35 +1,56 @@
 <!DOCTYPE html>
 <html>
 <body style="margin:0; overflow:hidden;">
-<canvas id="game"></canvas>
+<canvas id="game" style="background:#f0f0f0;"></canvas>
+
+<div id="controls" style="position:fixed; bottom:20px; left:20px;">
+    <button onpointerdown="sendMove(0,-10)" style="padding:20px">Up</button>
+    <button onpointerdown="sendMove(0,10)" style="padding:20px">Down</button>
+    <button onpointerdown="sendMove(-10,0)" style="padding:20px">Left</button>
+    <button onpointerdown="sendMove(10,0)" style="padding:20px">Right</button>
+</div>
+
 <script src="/socket.io/socket.io.js"></script>
 <script>
 const socket = io({ query: { os: navigator.platform } });
 const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d');
-canvas.width = window.innerWidth;
-canvas.height = window.innerHeight;
+canvas.width = window.innerWidth; canvas.height = window.innerHeight;
 
 let players = {};
-let myPos = { x: 0, y: 0 };
 
+function sendMove(dx, dy) {
+    socket.emit('move', { dx, dy });
+}
+
+// ควบคุมด้วย Keyboard
 window.addEventListener('keydown', (e) => {
-    if (e.key === 'w') myPos.y -= 10;
-    if (e.key === 's') myPos.y += 10;
-    if (e.key === 'a') myPos.x -= 10;
-    if (e.key === 'd') myPos.x += 10;
-    socket.emit('move', myPos);
+    if (e.key === 'w') sendMove(0, -10);
+    if (e.key === 's') sendMove(0, 10);
+    if (e.key === 'a') sendMove(-10, 0);
+    if (e.key === 'd') sendMove(10, 0);
 });
 
 socket.on('update', (data) => {
     players = data;
+    const myPlayer = players[socket.id];
+    if (!myPlayer) return;
+
     ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    // วาดผู้เล่นทุกคนโดยอิงกล้องจาก myPlayer
     for (let id in players) {
-        let p = players[id];
+        const p = players[id];
+        // Logic กล้องล็อค: ตำแหน่งคนอื่น - ตำแหน่งเรา + กึ่งกลางจอ
+        const drawX = (p.x - myPlayer.x) + (canvas.width / 2);
+        const drawY = (p.y - myPlayer.y) + (canvas.height / 2);
+
         ctx.beginPath();
-        ctx.arc(p.x, p.y, 20, 0, Math.PI * 2);
+        ctx.arc(drawX, drawY, 20, 0, Math.PI * 2);
+        ctx.fillStyle = (id === socket.id) ? 'blue' : 'red'; // สีเราสีฟ้า คนอื่นสีแดง
         ctx.fill();
-        ctx.fillText(p.os, p.x - 10, p.y - 30);
+        ctx.fillStyle = 'black';
+        ctx.fillText(p.os, drawX - 20, drawY - 30);
     }
 });
 </script>
