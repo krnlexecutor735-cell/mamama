@@ -1,5 +1,5 @@
 {
-  "name": "my-game-project",
+  "name": "multiplayer-game",
   "version": "1.0.0",
   "main": "server.js",
   "dependencies": {
