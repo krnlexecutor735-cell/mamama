@@ -5,30 +5,37 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>Multiplayer OS Game</title>
     <style>
-        /* ตั้งค่าความสูงให้ยืดหยุ่นตามอุปกรณ์เคลื่อนที่ */
+        /* ล็อก viewport ของระบบมือถือทั้งหมด ป้องกันปัญหาหน้าจอล้นขอบ */
         html, body { 
             margin: 0; 
             padding: 0; 
             width: 100%;
             height: 100%;
-            height: -webkit-fill-available; /* แก้ปัญหาสำหรับ iOS Safari */
+            overflow: hidden; 
+            position: fixed; /* ป้องกันการเลื่อนจอขึ้นลงในโทรศัพท์ */
+            top: 0;
+            left: 0;
+            bottom: 0;
+            right: 0;
             background-color: #111116; 
             color: #fff; 
             font-family: sans-serif; 
-            overflow: hidden; 
             user-select: none; 
+            -webkit-user-select: none;
         }
 
         #game-window { 
-            position: relative; 
+            position: absolute; 
+            top: 0;
+            left: 0;
             width: 100%; 
             height: 100%; 
-            height: 100dvh; /* ปรับความสูงตามพื้นที่หน้าจอจริงที่หักแถบนำทางออกแล้ว */
             background-image: 
                 linear-gradient(rgba(255, 255, 255, 0.05) 1.5px, transparent 1.5px),
                 linear-gradient(90deg, rgba(255, 255, 255, 0.05) 1.5px, transparent 1.5px);
             background-size: 80px 80px;
             background-position: 0px 0px;
+            overflow: hidden;
             box-sizing: border-box;
         }
         
@@ -36,41 +43,41 @@
         .player.remote { background-color: #2cb67d; box-shadow: 0 0 15px #2cb67d; }
         .player.local { left: 50%; top: 50%; z-index: 10; }
         
-        .os-tag { position: absolute; top: -35px; left: 50%; transform: translateX(-50%); background-color: rgba(0,0,0,0.8); padding: 4px 10px; border-radius: 4px; font-size: 12px; font-weight: bold; white-space: nowrap; border: 1px solid #7f5af0; }
+        .os-tag { position: absolute; top: -35px; left: 50%; transform: translateX(-50%); background-color: rgba(0,0,0,0.85); padding: 4px 10px; border-radius: 4px; font-size: 12px; font-weight: bold; white-space: nowrap; border: 1px solid #7f5af0; }
         .player.remote .os-tag { border-color: #2cb67d; }
         
-        /* ปรับปรุงตำแหน่งและขอบเขตของจอยสติ๊กให้กระชับขึ้นและพ้นจากขอบจอ */
+        /* เพิ่มระยะห่างที่ปลอดภัย (Safe Margins) ให้จอยสติ๊กไม่ตกขอบล่างของโทรศัพท์ */
         #joystick-zone { 
             position: absolute; 
-            bottom: 40px; 
-            left: 40px; 
-            width: 110px; 
-            height: 110px; 
-            background: rgba(255,255,255,0.05); 
-            border: 2px solid rgba(255,255,255,0.2); 
+            bottom: max(50px, 8%); /* ดันขึ้นจากขอบล่างตามขนาดหน้าจอจริง */
+            left: max(40px, 5%); 
+            width: 100px; 
+            height: 100px; 
+            background: rgba(255,255,255,0.08); 
+            border: 2px solid rgba(255,255,255,0.3); 
             border-radius: 50%; 
             touch-action: none; 
             z-index: 20; 
             box-sizing: border-box;
         }
         #joystick-stick { 
-            width: 44px; 
-            height: 44px; 
+            width: 40px; 
+            height: 40px; 
             background: #7f5af0; 
             border-radius: 50%; 
             position: absolute; 
-            top: 31px; 
-            left: 31px; 
+            top: 28px; 
+            left: 28px; 
             pointer-events: none; 
         }
 
-        /* กล่องแชทมาตรฐาน (PC / Tablet จอใหญ่) */
+        /* กล่องแชทถูกย้ายไปอยู่ด้านขวาบน เพื่อไม่ให้ถูกบดบังหรือตกขอบล่าง */
         #chat-container {
             position: absolute;
-            bottom: 30px;
-            right: 30px;
-            width: 320px;
-            height: 240px;
+            top: 20px;
+            right: 20px;
+            width: 280px;
+            height: 180px;
             background: rgba(17, 17, 22, 0.9);
             border: 1px solid #7f5af0;
             border-radius: 8px;
@@ -83,11 +90,11 @@
         #chat-messages {
             flex-grow: 1;
             overflow-y: auto;
-            padding: 10px;
-            font-size: 13px;
+            padding: 8px;
+            font-size: 12px;
             display: flex;
             flex-direction: column;
-            gap: 6px;
+            gap: 4px;
         }
         .chat-msg {
             word-break: break-word;
@@ -105,41 +112,36 @@
             background: rgba(255, 255, 255, 0.05);
             border: none;
             border-top: 1px solid rgba(127, 90, 240, 0.4);
-            padding: 12px;
+            padding: 10px;
             color: #fff;
             outline: none;
-            font-size: 14px;
+            font-size: 13px;
+            box-sizing: border-box;
         }
         #chat-input:focus {
             background: rgba(255, 255, 255, 0.1);
             border-top: 1px solid #7f5af0;
         }
 
-        /* การปรับแต่งหน้าจอสำหรับทางโทรศัพท์มือถือ (Media Query สำหรับหน้าจอขนาดเล็ก) */
+        /* ปรับดีไซน์เพิ่มเติมสำหรับโทรศัพท์หน้าจอเล็ก */
         @media (max-width: 768px) {
-            /* ย้ายกล่องแชทไปอยู่มุมขวาบน เพื่อไม่ให้ถูกแป้นคีย์บอร์ดเสมือนจากด้านล่างดันหรือบดบัง */
             #chat-container {
-                top: 20px;
-                bottom: auto;
-                right: 20px;
-                left: auto;
-                width: 240px;
-                height: 160px;
-                background: rgba(17, 17, 22, 0.95);
+                top: 15px;
+                right: 15px;
+                width: 200px;
+                height: 130px;
             }
             #chat-input {
                 padding: 8px;
-                font-size: 13px;
-            }
-            #chat-messages {
-                padding: 8px;
                 font-size: 12px;
             }
-
-            /* ปรับแต่งตำแหน่งและสเกลของจอยสติ๊กให้เหมาะสม ไม่ให้ตกขอบจอ */
+            #chat-messages {
+                padding: 6px;
+                font-size: 11px;
+            }
             #joystick-zone {
-                bottom: 30px;
-                left: 30px;
+                bottom: 40px;
+                left: 40px;
                 width: 90px;
                 height: 90px;
             }
@@ -160,7 +162,7 @@
     
     <div id="chat-container">
         <div id="chat-messages"></div>
-        <input type="text" id="chat-input" placeholder="พิมพ์ข้อความที่นี่..." autocomplete="off">
+        <input type="text" id="chat-input" placeholder="พิมพ์คุยที่นี่..." autocomplete="off">
     </div>
 </div>
 
@@ -207,11 +209,19 @@
                     remotePlayers[id] = {
                         x: serverPlayers[id].x,
                         y: serverPlayers[id].y,
+                        os: serverPlayers[id].os,
                         el: createPlayerDOM(serverPlayers[id].os)
                     };
                 } else {
                     remotePlayers[id].x = serverPlayers[id].x;
                     remotePlayers[id].y = serverPlayers[id].y;
+                    
+                    // แก้ไขบั๊ก: เมื่อฝั่งตรงข้ามส่ง OS สำเร็จ ให้เปลี่ยนคำว่า "Detecting..." ทันที
+                    if (remotePlayers[id].os !== serverPlayers[id].os) {
+                        remotePlayers[id].os = serverPlayers[id].os;
+                        const tagEl = remotePlayers[id].el.querySelector('.os-tag');
+                        if (tagEl) tagEl.textContent = serverPlayers[id].os;
+                    }
                 }
             }
         });
@@ -245,7 +255,7 @@
     function createPlayerDOM(os) {
         const el = document.createElement('div');
         el.className = 'player remote';
-        el.innerHTML = `<div class="os-tag">${os}</div>`;
+        el.innerHTML = `<div class="os-tag">${escapeHTML(os)}</div>`;
         gameWindow.appendChild(el);
         return el;
     }
@@ -255,7 +265,7 @@
     myEl.innerHTML = `<div class="os-tag">${detectOS()}</div>`;
     gameWindow.appendChild(myEl);
 
-    // เปิดใช้งานจอยสติ๊กเฉพาะบนอุปกรณ์หน้าจอสัมผัส
+    // เช็คอุปกรณ์เพื่อแสดงผลจอยสติ๊กเฉพาะบนมือถือ
     if (!/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)) {
         joystickZone.style.display = 'none';
     }
