@@ -539,20 +539,18 @@
             const actions = document.createElement('div');
             actions.className = 'bubble-actions';
 
-            if (hasMarkdown || data.file) {
+            if (hasMarkdown) {
                 const expandBtn = document.createElement('button');
                 expandBtn.className = 'action-icon-btn';
                 expandBtn.innerHTML = `<i data-lucide="maximize-2" style="width:14px;height:14px;"></i>`;
-                
-                if (hasMarkdown) {
-                    expandBtn.onclick = () => openMarkdownFullscreen(rawContentHTML);
-                } else if (data.file && data.file.type.startsWith('image/')) {
-                    expandBtn.onclick = () => openImageFullscreen(data.file.url);
-                }
-                
-                if (hasMarkdown || (data.file && data.file.type.startsWith('image/'))) {
-                    actions.appendChild(expandBtn);
-                }
+                expandBtn.onclick = () => openMarkdownFullscreen(rawContentHTML);
+                actions.appendChild(expandBtn);
+            } else if (data.file && data.file.type && data.file.type.startsWith('image/')) {
+                const expandBtn = document.createElement('button');
+                expandBtn.className = 'action-icon-btn';
+                expandBtn.innerHTML = `<i data-lucide="maximize-2" style="width:14px;height:14px;"></i>`;
+                expandBtn.onclick = () => openImageFullscreen(data.file.url);
+                actions.appendChild(expandBtn);
             }
 
             if (data.text) {
