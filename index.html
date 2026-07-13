@@ -2,362 +2,749 @@
 <html lang="th">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Multiplayer OS Game</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Shared Space</title>
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/dompurify/dist/purify.min.js"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
     <style>
-        /* ล็อก viewport ของระบบมือถือทั้งหมด ป้องกันปัญหาหน้าจอล้นขอบ */
-        html, body { 
-            margin: 0; 
-            padding: 0; 
-            width: 100%;
-            height: 100%;
-            overflow: hidden; 
-            position: fixed; /* ป้องกันการเลื่อนจอขึ้นลงในโทรศัพท์ */
-            top: 0;
-            left: 0;
-            bottom: 0;
-            right: 0;
-            background-color: #111116; 
-            color: #fff; 
-            font-family: sans-serif; 
-            user-select: none; 
-            -webkit-user-select: none;
+        :root {
+            --bg-main: #09090b;
+            --panel-bg: #18181b;
+            --panel-border: #27272a;
+            --text-main: #f4f4f5;
+            --text-muted: #71717a;
+            --blue-accent: #2563eb;
         }
 
-        #game-window { 
-            position: absolute; 
-            top: 0;
-            left: 0;
-            width: 100%; 
-            height: 100%; 
-            background-image: 
-                linear-gradient(rgba(255, 255, 255, 0.05) 1.5px, transparent 1.5px),
-                linear-gradient(90deg, rgba(255, 255, 255, 0.05) 1.5px, transparent 1.5px);
-            background-size: 80px 80px;
-            background-position: 0px 0px;
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        }
+
+        body {
+            background-color: var(--bg-main);
+            color: var(--text-main);
+            height: 100dvh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
             overflow: hidden;
-            box-sizing: border-box;
-        }
-        
-        .player { position: absolute; width: 40px; height: 40px; background-color: #7f5af0; border-radius: 50%; transform: translate(-50%, -50%); box-shadow: 0 0 15px #7f5af0; }
-        .player.remote { background-color: #2cb67d; box-shadow: 0 0 15px #2cb67d; }
-        .player.local { left: 50%; top: 50%; z-index: 10; }
-        
-        .os-tag { position: absolute; top: -35px; left: 50%; transform: translateX(-50%); background-color: rgba(0,0,0,0.85); padding: 4px 10px; border-radius: 4px; font-size: 12px; font-weight: bold; white-space: nowrap; border: 1px solid #7f5af0; }
-        .player.remote .os-tag { border-color: #2cb67d; }
-        
-        /* เพิ่มระยะห่างที่ปลอดภัย (Safe Margins) ให้จอยสติ๊กไม่ตกขอบล่างของโทรศัพท์ */
-        #joystick-zone { 
-            position: absolute; 
-            bottom: max(50px, 8%); /* ดันขึ้นจากขอบล่างตามขนาดหน้าจอจริง */
-            left: max(40px, 5%); 
-            width: 100px; 
-            height: 100px; 
-            background: rgba(255,255,255,0.08); 
-            border: 2px solid rgba(255,255,255,0.3); 
-            border-radius: 50%; 
-            touch-action: none; 
-            z-index: 20; 
-            box-sizing: border-box;
-        }
-        #joystick-stick { 
-            width: 40px; 
-            height: 40px; 
-            background: #7f5af0; 
-            border-radius: 50%; 
-            position: absolute; 
-            top: 28px; 
-            left: 28px; 
-            pointer-events: none; 
         }
 
-        /* กล่องแชทถูกย้ายไปอยู่ด้านขวาบน เพื่อไม่ให้ถูกบดบังหรือตกขอบล่าง */
-        #chat-container {
-            position: absolute;
-            top: 20px;
-            right: 20px;
-            width: 280px;
-            height: 180px;
-            background: rgba(17, 17, 22, 0.9);
-            border: 1px solid #7f5af0;
+        #login-screen {
+            background: var(--panel-bg);
+            padding: 32px;
+            border-radius: 16px;
+            border: 1px solid var(--panel-border);
+            width: 90%;
+            max-width: 380px;
+            z-index: 10;
+        }
+
+        #login-screen h2 {
+            font-weight: 600;
+            margin-bottom: 6px;
+            font-size: 1.4rem;
+        }
+
+        #login-screen input {
+            padding: 12px 16px;
+            width: 100%;
+            margin-top: 16px;
+            margin-bottom: 12px;
             border-radius: 8px;
+            border: 1px solid var(--panel-border);
+            background-color: var(--bg-main);
+            color: white;
+            font-size: 0.95rem;
+            outline: none;
+        }
+
+        #login-screen button {
+            width: 100%;
+            padding: 12px;
+            background-color: var(--text-main);
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            color: var(--bg-main);
+            font-weight: 600;
+            font-size: 0.95rem;
+        }
+
+        #app-container {
+            display: none;
+            width: 100vw;
+            height: 100dvh;
+            flex-direction: column;
+            position: relative;
+        }
+
+        .chat-header {
+            height: 64px;
+            padding: 0 20px;
+            background: var(--panel-bg);
+            border-bottom: 1px solid var(--panel-border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .chat-header h3 {
+            font-size: 1rem;
+            font-weight: 600;
+        }
+
+        .status-badge {
+            background-color: rgba(239, 68, 68, 0.2);
+            color: #f87171;
+            font-size: 0.75rem;
+            padding: 4px 10px;
+            border-radius: 99px;
+            display: none;
+        }
+
+        .messages-container {
+            flex: 1;
+            padding: 20px;
+            overflow-y: auto;
             display: flex;
             flex-direction: column;
-            z-index: 30;
-            overflow: hidden;
-            box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+            gap: 14px;
         }
-        #chat-messages {
-            flex-grow: 1;
-            overflow-y: auto;
-            padding: 8px;
-            font-size: 12px;
+
+        .messages-container::-webkit-scrollbar {
+            width: 4px;
+        }
+        .messages-container::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        .messages-container::-webkit-scrollbar-thumb {
+            background: var(--panel-border);
+            border-radius: 10px;
+        }
+
+        .message-bubble {
+            background: var(--panel-bg);
+            padding: 12px 16px;
+            border-radius: 12px;
+            max-width: 75%;
+            align-self: flex-start;
+            border: 1px solid var(--panel-border);
             display: flex;
             flex-direction: column;
             gap: 4px;
         }
-        .chat-msg {
-            word-break: break-word;
-            line-height: 1.4;
-        }
-        .chat-msg .os-label {
-            font-weight: bold;
-            color: #7f5af0;
-            margin-right: 5px;
-        }
-        .chat-msg.remote .os-label {
-            color: #2cb67d;
-        }
-        #chat-input {
-            background: rgba(255, 255, 255, 0.05);
-            border: none;
-            border-top: 1px solid rgba(127, 90, 240, 0.4);
-            padding: 10px;
-            color: #fff;
-            outline: none;
-            font-size: 13px;
-            box-sizing: border-box;
-        }
-        #chat-input:focus {
-            background: rgba(255, 255, 255, 0.1);
-            border-top: 1px solid #7f5af0;
+
+        .message-bubble.me {
+            background: rgba(255, 255, 255, 0.02);
+            align-self: flex-end;
         }
 
-        /* ปรับดีไซน์เพิ่มเติมสำหรับโทรศัพท์หน้าจอเล็ก */
-        @media (max-width: 768px) {
-            #chat-container {
-                top: 15px;
-                right: 15px;
-                width: 200px;
-                height: 130px;
-            }
-            #chat-input {
-                padding: 8px;
-                font-size: 12px;
-            }
-            #chat-messages {
-                padding: 6px;
-                font-size: 11px;
-            }
-            #joystick-zone {
-                bottom: 40px;
-                left: 40px;
-                width: 90px;
-                height: 90px;
-            }
-            #joystick-stick {
-                width: 36px;
-                height: 36px;
-                top: 25px;
-                left: 25px;
-            }
+        .message-header {
+            font-size: 0.7rem;
+            color: var(--text-muted);
+            font-weight: 500;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .message-content {
+            word-break: break-word;
+            font-size: 0.9rem;
+            line-height: 1.5;
+        }
+
+        .message-content a {
+            color: var(--blue-accent);
+            text-decoration: none;
+        }
+
+        .message-content code {
+            background-color: rgba(255, 255, 255, 0.05);
+            padding: 2px 4px;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 0.85em;
+        }
+
+        .message-content pre {
+            background-color: rgba(0, 0, 0, 0.3);
+            padding: 10px;
+            border-radius: 6px;
+            overflow-x: auto;
+            margin: 6px 0;
+            border: 1px solid var(--panel-border);
+        }
+
+        .bubble-actions {
+            display: flex;
+            gap: 6px;
+            align-self: flex-end;
+            margin-top: 2px;
+        }
+
+        .action-icon-btn {
+            background: none;
+            border: none;
+            color: var(--text-muted);
+            cursor: pointer;
+            padding: 2px;
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .action-icon-btn:hover {
+            color: var(--text-main);
+        }
+
+        .attachment-preview {
+            max-width: 100%;
+            max-height: 200px;
+            border-radius: 8px;
+            margin-top: 4px;
+            border: 1px solid var(--panel-border);
+            object-fit: cover;
+        }
+
+        .file-link {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            background-color: rgba(255, 255, 255, 0.02);
+            padding: 8px 12px;
+            border-radius: 8px;
+            margin-top: 4px;
+            text-decoration: none;
+            color: var(--text-main);
+            font-size: 0.8rem;
+            border: 1px solid var(--panel-border);
+        }
+
+        .chat-input-bar {
+            background: var(--panel-bg);
+            border-top: 1px solid var(--panel-border);
+            display: flex;
+            flex-direction: column;
+            padding: 14px 20px;
+            z-index: 5;
+        }
+
+        .staged-preview-container {
+            display: none;
+            background-color: rgba(255, 255, 255, 0.02);
+            border: 1px solid var(--panel-border);
+            border-radius: 8px;
+            padding: 8px;
+            margin-bottom: 10px;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .staged-info {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.8rem;
+        }
+
+        .staged-thumbnail {
+            width: 36px;
+            height: 36px;
+            border-radius: 4px;
+            object-fit: cover;
+            border: 1px solid var(--panel-border);
+        }
+
+        .progress-bar-outer {
+            display: none;
+            width: 100%;
+            height: 4px;
+            background-color: var(--panel-border);
+            border-radius: 2px;
+            margin-bottom: 10px;
+            overflow: hidden;
+        }
+
+        .progress-bar-inner {
+            width: 0%;
+            height: 100%;
+            background-color: var(--text-main);
+            transition: width 0.1s linear;
+        }
+
+        .input-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .input-wrapper {
+            flex-grow: 1;
+            background-color: var(--bg-main);
+            border: 1px solid var(--panel-border);
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            padding: 2px 10px;
+        }
+
+        .input-box {
+            flex-grow: 1;
+            background: none;
+            border: none;
+            padding: 8px 4px;
+            color: white;
+            font-size: 0.9rem;
+            outline: none;
+            resize: none;
+            max-height: 80px;
+        }
+
+        .btn-action {
+            background: none;
+            border: none;
+            border-radius: 8px;
+            width: 36px;
+            height: 36px;
+            color: var(--text-muted);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .btn-action:hover {
+            color: var(--text-main);
+            background-color: rgba(255, 255, 255, 0.04);
+        }
+
+        .btn-send {
+            background-color: var(--text-main);
+            color: var(--bg-main);
+        }
+
+        .btn-send:hover {
+            opacity: 0.9;
+        }
+
+        #fullscreen-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100dvh;
+            background-color: rgba(0, 0, 0, 0.95);
+            z-index: 10000;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .fullscreen-close {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--panel-border);
+            color: white;
+            border-radius: 50%;
+            width: 44px;
+            height: 44px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+        }
+
+        .fullscreen-content-area {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            overflow-y: auto;
+        }
+
+        .fullscreen-content-area img {
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain;
+        }
+
+        .fullscreen-markdown {
+            background-color: var(--panel-bg);
+            border: 1px solid var(--panel-border);
+            padding: 30px;
+            border-radius: 12px;
+            max-width: 800px;
+            width: 100%;
+            max-height: 80%;
+            overflow-y: auto;
+        }
+
+        .fullscreen-markdown a {
+            color: var(--blue-accent);
+        }
+
+        .system-notice {
+            align-self: center;
+            background: rgba(255, 255, 255, 0.02);
+            color: var(--text-muted);
+            font-size: 0.7rem;
+            padding: 4px 12px;
+            border-radius: 99px;
+            border: 1px solid var(--panel-border);
+            margin: 6px 0;
         }
     </style>
-    <script src="/socket.io/socket.io.js"></script>
 </head>
 <body>
 
-<div id="game-window">
-    <div id="joystick-zone"><div id="joystick-stick"></div></div>
-    
-    <div id="chat-container">
-        <div id="chat-messages"></div>
-        <input type="text" id="chat-input" placeholder="พิมพ์คุยที่นี่..." autocomplete="off">
+    <div id="login-screen">
+        <h2>ระบุชื่อผู้ใช้</h2>
+        <p style="font-size: 0.8rem; color: var(--text-muted);">เพื่อจัดระเบียบการจัดส่งข้อความร่วมกัน</p>
+        <input type="text" id="username-input" placeholder="พิมพ์ชื่อผู้ใช้ของคุณ..." maxlength="20" onkeypress="handleEnter(event)">
+        <button onclick="registerUser()">เชื่อมต่อระบบแชท</button>
     </div>
-</div>
 
-<script>
-    const socket = io();
-    const gameWindow = document.getElementById('game-window');
-    const joystickZone = document.getElementById('joystick-zone');
-    const joystickStick = document.getElementById('joystick-stick');
-    const chatContainer = document.getElementById('chat-container');
-    const chatMessages = document.getElementById('chat-messages');
-    const chatInput = document.getElementById('chat-input');
+    <div id="app-container">
+        <div class="chat-header">
+            <div>
+                <h3>ห้องแชทสเปซเรียบง่าย</h3>
+                <span id="active-user-name" style="font-size: 0.75rem; color: var(--text-muted);"></span>
+            </div>
+            <div id="network-alert" class="status-badge">สัญญาณขาดหาย</div>
+        </div>
+        
+        <div class="messages-container" id="chat-messages"></div>
 
-    let localPlayer = { x: 0, y: 0 }; 
-    let remotePlayers = {}; 
-    let keys = {};
-    let joystickInput = { x: 0, y: 0 };
-    let isDragging = false;
-    let isTyping = false; 
-    const speed = 5;
+        <div class="chat-input-bar">
+            <div class="staged-preview-container" id="staged-container">
+                <div class="staged-info">
+                    <img id="staged-img-view" class="staged-thumbnail" style="display: none;">
+                    <span id="staged-file-name" style="word-break: break-all;"></span>
+                </div>
+                <button class="action-icon-btn" onclick="clearStagedFile()"><i data-lucide="x"></i></button>
+            </div>
 
-    function detectOS() {
-        const ua = navigator.userAgent;
-        if (/android/i.test(ua)) return 'Android';
-        if (/iPad|iPhone|iPod/.test(ua)) return 'iOS';
-        if (/Macintosh|MacIntel/.test(ua)) return 'Mac OS';
-        if (/Win32|Win64|Windows/.test(ua)) return 'Windows';
-        if (/Linux/.test(ua)) return 'Linux';
-        return 'Unknown OS';
-    }
+            <div class="progress-bar-outer" id="progress-bar-wrap">
+                <div class="progress-bar-inner" id="progress-indicator"></div>
+            </div>
 
-    function escapeHTML(text) {
-        const map = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' };
-        return text.replace(/[&<>"']/g, (m) => map[m]);
-    }
+            <div class="input-row">
+                <input type="file" id="file-input" style="display: none;" onchange="handleFileStaging(event)">
+                <button class="btn-action" onclick="document.getElementById('file-input').click()"><i data-lucide="plus"></i></button>
+                
+                <div class="input-wrapper">
+                    <textarea class="input-box" id="message-input" rows="1" placeholder="พิมพ์ข้อความ..." onkeydown="handleChatSubmit(event)"></textarea>
+                </div>
+                
+                <button class="btn-action btn-send" onclick="initiateSend()"><i data-lucide="send"></i></button>
+            </div>
+        </div>
+    </div>
 
-    socket.on('connect', () => {
-        socket.emit('initOS', detectOS());
-    });
+    <div id="fullscreen-overlay">
+        <button class="fullscreen-close" onclick="closeFullscreen()"><i data-lucide="x"></i></button>
+        <div class="fullscreen-content-area" id="fullscreen-viewer"></div>
+    </div>
 
-    socket.on('updatePlayers', (serverPlayers) => {
-        Object.keys(serverPlayers).forEach((id) => {
-            if (id !== socket.id) {
-                if (!remotePlayers[id]) {
-                    remotePlayers[id] = {
-                        x: serverPlayers[id].x,
-                        y: serverPlayers[id].y,
-                        os: serverPlayers[id].os,
-                        el: createPlayerDOM(serverPlayers[id].os)
-                    };
-                } else {
-                    remotePlayers[id].x = serverPlayers[id].x;
-                    remotePlayers[id].y = serverPlayers[id].y;
-                    
-                    // แก้ไขบั๊ก: เมื่อฝั่งตรงข้ามส่ง OS สำเร็จ ให้เปลี่ยนคำว่า "Detecting..." ทันที
-                    if (remotePlayers[id].os !== serverPlayers[id].os) {
-                        remotePlayers[id].os = serverPlayers[id].os;
-                        const tagEl = remotePlayers[id].el.querySelector('.os-tag');
-                        if (tagEl) tagEl.textContent = serverPlayers[id].os;
+    <script>
+        const socket = io();
+        let myUsername = '';
+        let stagedFileObj = null;
+
+        window.addEventListener('DOMContentLoaded', () => {
+            lucide.createIcons();
+        });
+
+        socket.on('disconnect', () => {
+            document.getElementById('network-alert').style.display = 'block';
+            document.getElementById('message-input').disabled = true;
+        });
+
+        socket.on('connect', () => {
+            document.getElementById('network-alert').style.display = 'none';
+            document.getElementById('message-input').disabled = false;
+            if (myUsername) {
+                socket.emit('check-username', myUsername, (res) => {
+                    if (!res.success) {
+                        window.location.reload();
                     }
+                });
+            }
+        });
+
+        function handleEnter(e) {
+            if (e.key === 'Enter') registerUser();
+        }
+
+        function registerUser() {
+            const input = document.getElementById('username-input');
+            const username = input.value.trim();
+            if (!username) return;
+
+            socket.emit('check-username', username, (res) => {
+                if (res.success) {
+                    myUsername = username;
+                    document.getElementById('login-screen').style.display = 'none';
+                    document.getElementById('app-container').style.display = 'flex';
+                    document.getElementById('active-user-name').innerText = `@${myUsername}`;
+                } else {
+                    alert('ชื่อนี้ไม่สามารถใช้งานได้');
+                }
+            });
+        }
+
+        function linkify(text) {
+            const urlRegex = /(\b(https?|ftp|file):\/\/[-A-Z0-9+&@#\/%?=~_|!:,.;]*[-A-Z0-9+&@#\/%=~_|])/ig;
+            return text.replace(urlRegex, (url) => {
+                return `<a href="${url}" target="_blank" rel="noopener noreferrer">${url}</a>`;
+            });
+        }
+
+        function renderMessage(data) {
+            const isMe = data.sender === myUsername;
+            const bubble = document.createElement('div');
+            bubble.className = `message-bubble ${isMe ? 'me' : ''}`;
+            bubble.id = `msg-${data.id}`;
+
+            const header = document.createElement('div');
+            header.className = 'message-header';
+            header.innerHTML = `<span>${escapeHTML(data.sender)}</span><span>${data.timestamp}</span>`;
+
+            const content = document.createElement('div');
+            content.className = 'message-content';
+
+            const hasMarkdown = /[*_#`\[\]\-]/.test(data.text);
+            let rawContentHTML = '';
+            if (hasMarkdown) {
+                rawContentHTML = DOMPurify.sanitize(marked.parse(data.text));
+                content.innerHTML = rawContentHTML;
+            } else {
+                content.innerHTML = linkify(escapeHTML(data.text));
+            }
+
+            const actions = document.createElement('div');
+            actions.className = 'bubble-actions';
+
+            if (hasMarkdown || data.file) {
+                const expandBtn = document.createElement('button');
+                expandBtn.className = 'action-icon-btn';
+                expandBtn.innerHTML = `<i data-lucide="maximize-2" style="width:14px;height:14px;"></i>`;
+                
+                if (hasMarkdown) {
+                    expandBtn.onclick = () => openMarkdownFullscreen(rawContentHTML);
+                } else if (data.file && data.file.type.startsWith('image/')) {
+                    expandBtn.onclick = () => openImageFullscreen(data.file.url);
+                }
+                
+                if (hasMarkdown || (data.file && data.file.type.startsWith('image/'))) {
+                    actions.appendChild(expandBtn);
                 }
             }
-        });
-    });
 
-    socket.on('playerMoved', (data) => {
-        if (remotePlayers[data.id]) {
-            remotePlayers[data.id].x = data.x;
-            remotePlayers[data.id].y = data.y;
-        }
-    });
-
-    socket.on('playerDisconnected', (id) => {
-        if (remotePlayers[id]) {
-            remotePlayers[id].el.remove();
-            delete remotePlayers[id];
-        }
-    });
-
-    socket.on('newMessage', (data) => {
-        const messageDiv = document.createElement('div');
-        const isMe = data.id === socket.id;
-        
-        messageDiv.className = `chat-msg ${isMe ? 'local' : 'remote'}`;
-        messageDiv.innerHTML = `<span class="os-label">[${data.os}]</span>: ${escapeHTML(data.text)}`;
-        
-        chatMessages.appendChild(messageDiv);
-        chatMessages.scrollTop = chatMessages.scrollHeight;
-    });
-
-    function createPlayerDOM(os) {
-        const el = document.createElement('div');
-        el.className = 'player remote';
-        el.innerHTML = `<div class="os-tag">${escapeHTML(os)}</div>`;
-        gameWindow.appendChild(el);
-        return el;
-    }
-
-    const myEl = document.createElement('div');
-    myEl.className = 'player local';
-    myEl.innerHTML = `<div class="os-tag">${detectOS()}</div>`;
-    gameWindow.appendChild(myEl);
-
-    // เช็คอุปกรณ์เพื่อแสดงผลจอยสติ๊กเฉพาะบนมือถือ
-    if (!/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)) {
-        joystickZone.style.display = 'none';
-    }
-
-    chatInput.addEventListener('focus', () => { isTyping = true; });
-    chatInput.addEventListener('blur', () => { isTyping = false; });
-
-    window.addEventListener('keydown', (e) => { 
-        if (isTyping) return;
-        keys[e.key.toLowerCase()] = true; 
-    });
-    window.addEventListener('keyup', (e) => { 
-        if (isTyping) return;
-        keys[e.key.toLowerCase()] = false; 
-    });
-
-    chatInput.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter') {
-            const message = chatInput.value.trim();
-            if (message !== '') {
-                socket.emit('sendMessage', message);
-                chatInput.value = '';
+            if (data.text) {
+                const copyBtn = document.createElement('button');
+                copyBtn.className = 'action-icon-btn';
+                copyBtn.innerHTML = `<i data-lucide="copy" style="width:14px;height:14px;"></i>`;
+                copyBtn.onclick = () => copyToClipboard(data.text);
+                actions.appendChild(copyBtn);
             }
-            chatInput.blur(); 
-        }
-    });
 
-    joystickZone.addEventListener('touchstart', (e) => { isDragging = true; handleJoystick(e); });
-    window.addEventListener('touchmove', (e) => { if (isDragging) handleJoystick(e); }, { passive: false });
-    window.addEventListener('touchend', () => {
-        isDragging = false;
-        joystickStick.style.transform = 'translate(0px, 0px)';
-        joystickInput = { x: 0, y: 0 };
-    });
+            bubble.appendChild(header);
+            bubble.appendChild(content);
+            bubble.appendChild(actions);
 
-    function handleJoystick(e) {
-        e.preventDefault();
-        const touch = e.touches[0];
-        const rect = joystickZone.getBoundingClientRect();
-        const centerX = rect.left + rect.width / 2;
-        const centerY = rect.top + rect.height / 2;
-        let deltaX = touch.clientX - centerX;
-        let deltaY = touch.clientY - centerY;
-        const distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
-        const maxRadius = rect.width / 2;
+            if (data.file) {
+                if (data.file.type.startsWith('image/')) {
+                    const img = document.createElement('img');
+                    img.src = data.file.url;
+                    img.className = 'attachment-preview';
+                    bubble.appendChild(img);
+                } else {
+                    const link = document.createElement('a');
+                    link.href = data.file.url;
+                    link.download = data.file.name;
+                    link.className = 'file-link';
+                    link.innerHTML = `<i data-lucide="download" style="width:14px;height:14px;"></i> <span>${data.file.name}</span>`;
+                    bubble.appendChild(link);
+                }
+            }
 
-        if (distance > maxRadius) {
-            deltaX = (deltaX / distance) * maxRadius;
-            deltaY = (deltaY / distance) * maxRadius;
-        }
-        joystickStick.style.transform = `translate(${deltaX}px, ${deltaY}px)`;
-        joystickInput.x = deltaX / maxRadius;
-        joystickInput.y = deltaY / maxRadius;
-    }
-
-    function update() {
-        let moved = false;
-        
-        if (!isTyping) {
-            if (keys['w'] || keys['arrowup']) { localPlayer.y -= speed; moved = true; }
-            if (keys['s'] || keys['arrowdown']) { localPlayer.y += speed; moved = true; }
-            if (keys['a'] || keys['arrowleft']) { localPlayer.x -= speed; moved = true; }
-            if (keys['d'] || keys['arrowright']) { localPlayer.x += speed; moved = true; }
+            return bubble;
         }
 
-        if (joystickInput.x !== 0 || joystickInput.y !== 0) {
-            localPlayer.x += joystickInput.x * speed;
-            localPlayer.y += joystickInput.y * speed;
-            moved = true;
+        function handleFileStaging(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            stagedFileObj = file;
+
+            const previewContainer = document.getElementById('staged-container');
+            const thumb = document.getElementById('staged-img-view');
+            const filename = document.getElementById('staged-file-name');
+
+            filename.innerText = file.name;
+            previewContainer.style.display = 'flex';
+
+            if (file.type.startsWith('image/')) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    thumb.src = e.target.result;
+                    thumb.style.display = 'block';
+                };
+                reader.readAsDataURL(file);
+            } else {
+                thumb.style.display = 'none';
+            }
+            lucide.createIcons();
         }
 
-        if (moved) {
-            socket.emit('move', { x: localPlayer.x, y: localPlayer.y });
+        function clearStagedFile() {
+            stagedFileObj = null;
+            document.getElementById('file-input').value = '';
+            document.getElementById('staged-container').style.display = 'none';
         }
 
-        gameWindow.style.backgroundPosition = `${-localPlayer.x}px ${-localPlayer.y}px`;
+        function handleChatSubmit(e) {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                initiateSend();
+            }
+        }
 
-        const centerX = window.innerWidth / 2;
-        const centerY = window.innerHeight / 2;
+        function initiateSend() {
+            const input = document.getElementById('message-input');
+            const text = input.value.trim();
 
-        Object.keys(remotePlayers).forEach((id) => {
-            const rp = remotePlayers[id];
-            const screenX = centerX + (rp.x - localPlayer.x);
-            const screenY = centerY + (rp.y - localPlayer.y);
-            
-            rp.el.style.left = screenX + 'px';
-            rp.el.style.top = screenY + 'px';
+            if (!text && !stagedFileObj) return;
+
+            if (stagedFileObj) {
+                const formData = new FormData();
+                formData.append('file', stagedFileObj);
+
+                const xhr = new XMLHttpRequest();
+                const progressOuter = document.getElementById('progress-bar-wrap');
+                const progressInner = document.getElementById('progress-indicator');
+
+                progressOuter.style.display = 'block';
+                progressInner.style.width = '0%';
+
+                xhr.upload.addEventListener('progress', (e) => {
+                    if (e.lengthComputable) {
+                        const percent = (e.loaded / e.total) * 100;
+                        progressInner.style.width = percent + '%';
+                    }
+                });
+
+                xhr.onreadystatechange = () => {
+                    if (xhr.readyState === XMLHttpRequest.DONE) {
+                        progressOuter.style.display = 'none';
+                        if (xhr.status === 200) {
+                            const response = JSON.parse(xhr.responseText);
+                            socket.emit('send-message', {
+                                text: text,
+                                file: response
+                            });
+                            clearStagedFile();
+                        } else {
+                            alert('การอัปโหลดไฟล์ล้มเหลว');
+                        }
+                    }
+                };
+
+                xhr.open('POST', '/upload', true);
+                xhr.send(formData);
+                input.value = '';
+            } else {
+                socket.emit('send-message', {
+                    text: text,
+                    file: null
+                });
+                input.value = '';
+            }
+        }
+
+        socket.on('chat-history', (history) => {
+            const container = document.getElementById('chat-messages');
+            container.innerHTML = '';
+            history.forEach(data => {
+                container.appendChild(renderMessage(data));
+            });
+            lucide.createIcons();
+            scrollToBottom();
         });
 
-        requestAnimationFrame(update);
-    }
-    requestAnimationFrame(update);
-</script>
+        socket.on('new-message', (data) => {
+            const container = document.getElementById('chat-messages');
+            container.appendChild(renderMessage(data));
+            lucide.createIcons();
+            scrollToBottom();
+        });
+
+        socket.on('user-joined', (username) => {
+            showNotification(`${username} ได้เชื่อมต่อเข้าแชท`);
+        });
+
+        socket.on('user-left', (username) => {
+            showNotification(`${username} ได้ออกจากห้องแชท`);
+        });
+
+        function openImageFullscreen(src) {
+            const viewer = document.getElementById('fullscreen-viewer');
+            viewer.innerHTML = `<img src="${src}">`;
+            document.getElementById('fullscreen-overlay').style.display = 'flex';
+        }
+
+        function openMarkdownFullscreen(htmlContent) {
+            const viewer = document.getElementById('fullscreen-viewer');
+            viewer.innerHTML = `<div class="fullscreen-markdown">${htmlContent}</div>`;
+            document.getElementById('fullscreen-overlay').style.display = 'flex';
+        }
+
+        function closeFullscreen() {
+            document.getElementById('fullscreen-overlay').style.display = 'none';
+            document.getElementById('fullscreen-viewer').innerHTML = '';
+        }
+
+        function copyToClipboard(text) {
+            navigator.clipboard.writeText(text).then(() => {
+                alert('คัดลอกข้อความแล้ว');
+            });
+        }
+
+        function showNotification(text) {
+            const container = document.getElementById('chat-messages');
+            const notice = document.createElement('div');
+            notice.className = 'system-notice';
+            notice.text = text;
+            notice.innerText = text;
+            container.appendChild(notice);
+            scrollToBottom();
+        }
+
+        function escapeHTML(str) {
+            return str.replace(/[&<>'"]/g, 
+                tag => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[tag] || tag)
+            );
+        }
+
+        function scrollToBottom() {
+            const el = document.getElementById('chat-messages');
+            el.scrollTop = el.scrollHeight;
+        }
+    </script>
 </body>
 </html>
